@@ -130,8 +130,8 @@ for s in "$here/entrypoint.sh" "$here/dotnet/entrypoint.sh"; do
   # shellcheck disable=SC2016
   check "$n has no GitHub expression" hasnt "$s" '${{'
 done
-check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.10.0 ]
-check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.10.0 ]
+check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.11.0 ]
+check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.11.0 ]
 
 echo "== shellcheck"
 for s in entrypoint.sh dotnet/entrypoint.sh test/run.sh test/stub/qualor test/stub/dotnet; do
