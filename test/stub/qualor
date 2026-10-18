@@ -1,0 +1,22 @@
+#!/bin/sh
+# Test stub for qualor: records its arguments, its environment and whether git can read the
+# checkout, then exits with STUB_EXIT (for scan and dotnet end; 0 by default).
+out=/out
+name=$(echo "$*" | cut -d' ' -f1-2 | tr ' ' '-')
+case $1 in scan) name=scan ;; esac
+{
+  printf 'qualor'
+  for a in "$@"; do printf ' [%s]' "$a"; done
+  echo
+} >> "$out/calls"
+env | sort > "$out/env-$name"
+pwd > "$out/pwd-$name"
+if git rev-parse HEAD > /dev/null 2>&1; then echo ok; else echo failed; fi > "$out/git-$name"
+code=0
+case $name in
+  dotnet-begin) mkdir -p .qualor/dotnet ;;
+  dotnet-end) rm -rf .qualor/dotnet; code=${STUB_EXIT:-0} ;;
+  dotnet-abort) rm -rf .qualor/dotnet ;;
+  scan) code=${STUB_EXIT:-0} ;;
+esac
+exit "$code"

@@ -1,0 +1,123 @@
+#!/bin/sh
+# qualor-dev/scan-action/dotnet: runs `qualor dotnet begin`, the build command and
+# `qualor dotnet end` in the qualor/scanner-dotnet image.
+# dotnet/action.yml runs this same text inline (`sh -c`), because GitHub does not mount the
+# action's own directory into a docker:// image. Keep the two identical (test/run.sh checks it),
+# and keep this text free of backslashes and of GitHub expressions (dollar sign, double brace).
+set -u
+
+fail() {
+  echo "::error::$1"
+  exit 2
+}
+
+# An input's value. GitHub names the variable INPUT_ plus the input name in upper case and keeps
+# its hyphens (INPUT_SERVER-URL). sh can neither expand nor pass on such a name, so it is read from
+# this shell's initial environment; a name without a hyphen falls back to the variable itself.
+input() {
+  v=$(sed -z -n "s/^INPUT_$1=//p" "/proc/$$/environ" 2>/dev/null)
+  if [ -z "$v" ]; then
+    v=$(printenv "INPUT_$(echo "$1" | sed 's/-/_/g')" || true)
+  fi
+  printf '%s' "$v"
+}
+
+# The image runs as the user node, which cannot write GitHub's /github/home, and the checkout
+# belongs to the runner's user: give git, NuGet and the MSBuild hook a home of their own and let
+# git read the checkout, without writing any configuration file. The checkout is not writable for
+# node either, so the build and the analysis run on a copy of it (below).
+HOME=/tmp/qualor-home
+export HOME
+mkdir -p "$HOME"
+GIT_CONFIG_COUNT=1
+GIT_CONFIG_KEY_0=safe.directory
+GIT_CONFIG_VALUE_0='*'
+export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+cd "${GITHUB_WORKSPACE:-.}" || fail 'The workspace is missing: run actions/checkout before this step'
+
+extra=$(input ARGS)
+# With --dry-run in args nothing is uploaded, and the server and the token may be left out.
+case " $extra " in
+  *' --dry-run '*) dry=true ;;
+  *) dry=false ;;
+esac
+
+url=$(input SERVER-URL)
+[ -n "$url" ] || url=${QUALOR_URL:-}
+[ -n "$url" ] || [ "$dry" = true ] || fail 'The server-url input is empty: set it to your Qualor server, for example https://qualor.example.com'
+
+# The token is passed to `qualor dotnet end` only and kept out of the build's own environment.
+# The build still runs in the same container as the upload and can read it (README, C#).
+token=$(input TOKEN)
+[ -n "$token" ] || token=${QUALOR_TOKEN:-}
+[ -n "$token" ] || [ "$dry" = true ] || fail 'The token input is empty: pass a project analysis token from a secret (GitHub gives no secrets to pull requests from forks)'
+unset INPUT_TOKEN QUALOR_TOKEN
+
+build=$(input BUILD-COMMAND)
+[ -n "$build" ] || build='dotnet build --no-incremental'
+config=$(input CONFIG)
+
+set --
+[ -z "$url" ] || set -- --server-url "$url"
+key=$(input PROJECT-KEY)
+[ -z "$key" ] || set -- "$@" --project-key "$key"
+[ -z "$config" ] || set -- "$@" --config "$config"
+case $(input WAIT) in
+  '' | true | True | TRUE) ;;
+  false | False | FALSE) set -- "$@" --no-wait ;;
+  *) fail 'The wait input must be true or false' ;;
+esac
+# The args input is split at blanks, like a command line without quotes; no file names expand.
+set -f
+# shellcheck disable=SC2086
+set -- "$@" $extra
+set +f
+
+session() {
+  if [ -n "$config" ]; then
+    qualor dotnet "$1" --config "$config"
+  else
+    qualor dotnet "$1"
+  fi
+}
+
+# Whatever happens after begin (a failed build, a failed end, a cancelled run), remove the MSBuild
+# hook and .qualor/dotnet when they are still there, and keep the step's exit code.
+# shellcheck disable=SC2329 # run by the trap
+cleanup() {
+  status=$?
+  trap - EXIT
+  if [ -d .qualor/dotnet ]; then
+    session abort || true
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# A copy of the checkout, with its history, that node owns: begin, the build and end run there,
+# so build outputs never land in the workspace.
+src=/tmp/qualor-src
+rm -rf "$src"
+mkdir -p "$src"
+echo "Copying the checkout to $src"
+cp -R . "$src/" || fail 'Could not copy the checkout'
+cd "$src" || fail 'Could not enter the copy of the checkout'
+
+session begin || exit $?
+
+echo "Running the build: $build"
+env -u QUALOR_TOKEN -u INPUT_TOKEN sh -c "$build"
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "::error::The build failed (exit code $status)"
+  exit "$status"
+fi
+
+if [ -n "$token" ]; then
+  QUALOR_TOKEN=$token qualor dotnet end "$@"
+else
+  qualor dotnet end "$@"
+fi
+exit $?

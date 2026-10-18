@@ -1,0 +1,12 @@
+#!/bin/sh
+# Test stub for dotnet: records its arguments, environment and directory (the build's) and
+# writes obj/, as a build does.
+{
+  printf 'dotnet'
+  for a in "$@"; do printf ' [%s]' "$a"; done
+  echo
+} >> /out/calls
+env | sort > /out/env-build
+pwd > /out/pwd-build
+mkdir -p obj && echo built > obj/out.txt || exit 1
+exit 0
