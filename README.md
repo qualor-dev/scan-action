@@ -4,8 +4,8 @@ Runs [Qualor](https://qualor.dev) code quality and security analysis in GitHub A
 scans your repository with the `qualor/scanner` image, uploads the analysis to your own Qualor
 server and fails the step when the quality gate fails.
 
-On pull requests, Qualor's GitHub App adds a check run with annotations on the changed lines and a
-summary comment. You connect the App once in Qualor; the workflow itself needs no write
+On pull requests, Qualor's GitHub App posts a check run, review comments on the changed lines and a
+summary comment, and with AI review on, the AI reviewer's threads. You connect the App once in Qualor; the workflow itself needs no write
 permission. See [qualor.dev/docs/github](https://qualor.dev/docs/github).
 
 ## Usage
@@ -64,7 +64,7 @@ jobs:
 
 Why the checkout looks like this:
 
-- `ref` checks out the **pull request's head**, not GitHub's merge commit, so annotations land on the
+- `ref` checks out the **pull request's head**, not GitHub's merge commit, so review comments land on the
   pull request's own lines.
 - `fetch-depth: 0` gives the full history, from which Qualor works out the new code.
 - `persist-credentials: false` keeps the job's GitHub token out of `.git/config`, where the

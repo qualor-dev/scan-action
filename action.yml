@@ -1,5 +1,5 @@
 name: Qualor scan
-description: Code quality and security analysis on your own Qualor server, with a quality gate
+description: Static analysis and AI code review on your own Qualor server, with a quality gate on new code
 author: Qualor
 branding:
   icon: shield
