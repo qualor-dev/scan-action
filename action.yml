@@ -26,7 +26,7 @@ inputs:
     required: false
 runs:
   using: docker
-  image: docker://qualor/scanner:0.12.1
+  image: docker://qualor/scanner:0.13.0
   entrypoint: /bin/sh
   # The script is entrypoint.sh, inline: GitHub does not mount the action's directory into the image.
   args:
