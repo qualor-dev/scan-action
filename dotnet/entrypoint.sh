@@ -60,7 +60,7 @@ config=$(input CONFIG)
 set --
 [ -z "$url" ] || set -- --server-url "$url"
 key=$(input PROJECT-KEY)
-[ -z "$key" ] || set -- "$@" --project-key "$key"
+[ -z "$key" ] || set -- "$@" "--project-key=$key"
 [ -z "$config" ] || set -- "$@" --config "$config"
 case $(input WAIT) in
   '' | true | True | TRUE) ;;

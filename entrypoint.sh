@@ -57,7 +57,7 @@ unset token
 set --
 [ -z "$url" ] || set -- --server-url "$url"
 key=$(input PROJECT-KEY)
-[ -z "$key" ] || set -- "$@" --project-key "$key"
+[ -z "$key" ] || set -- "$@" "--project-key=$key"
 config=$(input CONFIG)
 [ -z "$config" ] || set -- "$@" --config "$config"
 case $(input WAIT) in

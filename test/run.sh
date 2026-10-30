@@ -154,7 +154,7 @@ act "$SCANNER" "$ROOT" -e "$SP" -e GIT_CONFIG_NOSYSTEM=1 -e "INPUT_SERVER-URL=$U
   -e "INPUT_TOKEN=$TOKEN" -e "INPUT_PROJECT-KEY=acme/demo" -e INPUT_CONFIG=ci/qualor.yml -e INPUT_WAIT=false \
   -e "INPUT_ARGS=--sarif osv.sarif  --branch feature/x --coverage src/*.ts"
 check "exit 0" status_is 0
-check "arguments" same "$tmp/out/calls" "qualor [scan] [--server-url] [$URL] [--project-key] [acme/demo] [--config] [ci/qualor.yml] [--no-wait] [--sarif] [osv.sarif] [--branch] [feature/x] [--coverage] [src/*.ts]"
+check "arguments" same "$tmp/out/calls" "qualor [scan] [--server-url] [$URL] [--project-key=acme/demo] [--config] [ci/qualor.yml] [--no-wait] [--sarif] [osv.sarif] [--branch] [feature/x] [--coverage] [src/*.ts]"
 check "QUALOR_TOKEN set for the scan" has "$tmp/out/env-scan" "QUALOR_TOKEN=$TOKEN"
 check "INPUT_TOKEN removed" hasnt "$tmp/out/env-scan" "INPUT_TOKEN="
 check "HOME=/tmp/qualor-home" has "$tmp/out/env-scan" "HOME=/tmp/qualor-home"
@@ -210,7 +210,7 @@ act "$DOTNET" "$DN" -e "$DP" -e GIT_CONFIG_NOSYSTEM=1 -e "INPUT_SERVER-URL=$URL"
 check "exit 0" status_is 0
 check "begin, build, end in order, no abort" same "$tmp/out/calls" "qualor [dotnet] [begin] [--config] [qualor.yml]
 dotnet [build] [--no-incremental]
-qualor [dotnet] [end] [--server-url] [$URL] [--project-key] [acme/demo] [--config] [qualor.yml] [--no-wait] [--sarif] [osv.sarif]"
+qualor [dotnet] [end] [--server-url] [$URL] [--project-key=acme/demo] [--config] [qualor.yml] [--no-wait] [--sarif] [osv.sarif]"
 check "begin runs in the copy of the checkout" same "$tmp/out/pwd-dotnet-begin" /tmp/qualor-src
 check "the build runs in the copy" same "$tmp/out/pwd-build" /tmp/qualor-src
 check "end runs in the copy" same "$tmp/out/pwd-dotnet-end" /tmp/qualor-src
