@@ -158,6 +158,7 @@ check "arguments" same "$tmp/out/calls" "qualor [scan] [--server-url] [$URL] [--
 check "QUALOR_TOKEN set for the scan" has "$tmp/out/env-scan" "QUALOR_TOKEN=$TOKEN"
 check "INPUT_TOKEN removed" hasnt "$tmp/out/env-scan" "INPUT_TOKEN="
 check "HOME=/tmp/qualor-home" has "$tmp/out/env-scan" "HOME=/tmp/qualor-home"
+check "the vulnerability database cache defaults to the workspace" same "$tmp/out/trivy-scan" /github/workspace/.qualor/trivy
 check "safe.directory (key)" has "$tmp/out/env-scan" "GIT_CONFIG_KEY_0=safe.directory"
 check "safe.directory (value)" has "$tmp/out/env-scan" "GIT_CONFIG_VALUE_0=*"
 check "git reads the checkout of user 1001" same "$tmp/out/git-scan" ok
@@ -194,6 +195,10 @@ check "--dry-run without server and token runs (exit 0)" status_is 0
 check "--dry-run without server and token: arguments" same "$tmp/out/calls" "qualor [scan] [--dry-run] [--output] [/out/r.json.gz]"
 check "--dry-run without a token: no QUALOR_TOKEN" hasnt "$tmp/out/env-scan" "QUALOR_TOKEN="
 
+act "$SCANNER" "$ROOT" -e "$SP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKEN" -e INPUT_WAIT=true \
+  -e QUALOR_TRIVY_CACHE_DIR=/tmp/my-trivy
+check "a preset QUALOR_TRIVY_CACHE_DIR is kept" same "$tmp/out/trivy-scan" /tmp/my-trivy
+
 echo "== control: without the action's safe.directory git refuses the checkout"
 # The image's /etc/gitconfig trusts every directory too; the cases above ignore it
 # (GIT_CONFIG_NOSYSTEM=1), so they show that the action's own setting is enough.
@@ -221,10 +226,15 @@ check "nothing written in the checkout (no obj/, no .qualor/)" docker run --rm \
 check "the token is not in begin's environment" no_token "$tmp/out/env-dotnet-begin"
 check "the token is not in the build's environment" no_token "$tmp/out/env-build"
 check "the build has HOME=/tmp/qualor-home" has "$tmp/out/env-build" "HOME=/tmp/qualor-home"
+check "the vulnerability database cache defaults to the workspace" same "$tmp/out/trivy-dotnet-end" /github/workspace/.qualor/trivy
 check "end has QUALOR_TOKEN" has "$tmp/out/env-dotnet-end" "QUALOR_TOKEN=$TOKEN"
 check "git reads the checkout in end" same "$tmp/out/git-dotnet-end" ok
 check "no C# warning in the dotnet action" hasnt "$tmp/log" "::warning::"
 check "token not in the output" no_token "$tmp/log"
+
+act "$DOTNET" "$DN" -e "$DP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKEN" -e INPUT_WAIT=true \
+  -e QUALOR_TRIVY_CACHE_DIR=/tmp/my-trivy
+check "dotnet: a preset QUALOR_TRIVY_CACHE_DIR is kept" same "$tmp/out/trivy-dotnet-end" /tmp/my-trivy
 
 echo "== dotnet: a failing build"
 prep "$DOTNET" cs ro
@@ -249,7 +259,9 @@ check "token not in the output" no_token "$tmp/log"
 echo "== scan-action with the real scanner (--dry-run)"
 prep "$SCANNER" none ro
 sha=$(docker run --rm -v "$P-out:/out" --entrypoint cat "$SCANNER" /out/sha)
-act "$SCANNER" "$ROOT" -e GIT_CONFIG_NOSYSTEM=1 -e "INPUT_SERVER-URL=" -e "INPUT_TOKEN=$TOKEN" \
+# TODO(0.15 release): the 0.14.0 scanner refuses a cache directory inside the repository (the default
+# of the action), so this case sets one outside. Drop the variable when the image tag moves to 0.15.
+act "$SCANNER" "$ROOT" -e GIT_CONFIG_NOSYSTEM=1 -e QUALOR_TRIVY_CACHE_DIR=/tmp/qualor-trivy -e "INPUT_SERVER-URL=" -e "INPUT_TOKEN=$TOKEN" \
   -e "INPUT_PROJECT-KEY=" -e INPUT_CONFIG= -e INPUT_WAIT=false -e "INPUT_ARGS=--dry-run --output /out/report.json.gz" \
   -e GITHUB_EVENT_NAME=push -e GITHUB_REF=refs/heads/main -e GITHUB_REF_NAME=main \
   -e GITHUB_REF_TYPE=branch -e "GITHUB_SHA=$sha" -e GITHUB_REPOSITORY=acme/demo \

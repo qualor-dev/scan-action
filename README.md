@@ -95,6 +95,34 @@ The scanner runs as its own user and cannot write into the checkout, so an optio
 file (such as `--output`) needs a path under `/tmp`, for example `--output /tmp/report.json.gz`.
 Such a file is gone when the step ends.
 
+## Cache the vulnerability database
+
+Qualor takes the vulnerability database from your server, and a cache saves the download on later
+runs. The action is a Docker action and cannot run `actions/cache` itself, so put these two steps
+around it:
+
+```yaml
+- uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+  with:
+    path: .qualor/trivy
+    key: qualor-trivy-db-${{ github.run_id }}
+    restore-keys: qualor-trivy-db-
+- uses: qualor-dev/scan-action@v0.14
+  with:
+    server-url: ${{ vars.QUALOR_URL }}
+    token: ${{ secrets.QUALOR_TOKEN }}
+- uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+  if: always() && hashFiles('.qualor/trivy/server.json') != ''
+  with:
+    path: .qualor/trivy
+    key: qualor-trivy-db-${{ hashFiles('.qualor/trivy/server.json') }}
+```
+
+A cache inside the workspace is safe: the scanner uses the archive only after the Qualor server
+confirms its checksum.
+
+The action uses `.qualor/trivy` in the workspace unless `QUALOR_TRIVY_CACHE_DIR` is set.
+
 ## C#
 
 Qualor analyses C# inside your build, so C# projects use the `dotnet` action instead. It runs

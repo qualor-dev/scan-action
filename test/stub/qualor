@@ -11,6 +11,7 @@ case $1 in scan) name=scan ;; esac
 } >> "$out/calls"
 env | sort > "$out/env-$name"
 pwd > "$out/pwd-$name"
+echo "${QUALOR_TRIVY_CACHE_DIR-unset}" > "$out/trivy-$name"
 if git rev-parse HEAD > /dev/null 2>&1; then echo ok; else echo failed; fi > "$out/git-$name"
 code=0
 case $name in

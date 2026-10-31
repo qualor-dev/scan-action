@@ -71,6 +71,10 @@ runs:
       GIT_CONFIG_KEY_0=safe.directory
       GIT_CONFIG_VALUE_0='*'
       export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+      # The scanner keeps the vulnerability database in a cache inside the workspace, so a cache step can
+      # save and restore it; QUALOR_TRIVY_CACHE_DIR overrides the place.
+      QUALOR_TRIVY_CACHE_DIR=${QUALOR_TRIVY_CACHE_DIR:-${GITHUB_WORKSPACE:-$PWD}/.qualor/trivy}
+      export QUALOR_TRIVY_CACHE_DIR
       cd "${GITHUB_WORKSPACE:-.}" || fail 'The workspace is missing: run actions/checkout before this step'
 
       extra=$(input ARGS)
