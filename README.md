@@ -98,7 +98,7 @@ Such a file is gone when the step ends.
 ## Cache the vulnerability database
 
 Qualor takes the vulnerability database from your server, and a cache saves the download on later
-runs. The action is a Docker action and cannot run `actions/cache` itself, so put these two steps
+runs. The action is a Docker action and cannot run `actions/cache` itself, so put these three steps
 around it:
 
 ```yaml
@@ -107,6 +107,7 @@ around it:
     path: .qualor/trivy
     key: qualor-trivy-db-${{ github.run_id }}
     restore-keys: qualor-trivy-db-
+- run: mkdir -p .qualor/trivy && chmod 0777 .qualor/trivy
 - uses: qualor-dev/scan-action@v0.14
   with:
     server-url: ${{ vars.QUALOR_URL }}
@@ -118,10 +119,14 @@ around it:
     key: qualor-trivy-db-${{ hashFiles('.qualor/trivy/server.json') }}
 ```
 
+The `mkdir` step is needed because the action runs as its own user, which cannot create a
+directory in your checkout.
+
 A cache inside the workspace is safe: the scanner uses the archive only after the Qualor server
 confirms its checksum.
 
-The action uses `.qualor/trivy` in the workspace unless `QUALOR_TRIVY_CACHE_DIR` is set.
+The action uses `.qualor/trivy` in the workspace unless `QUALOR_TRIVY_CACHE_DIR` is set. The same
+three steps go around `qualor-dev/scan-action/dotnet`.
 
 ## C#
 

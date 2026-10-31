@@ -199,6 +199,16 @@ act "$SCANNER" "$ROOT" -e "$SP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKE
   -e QUALOR_TRIVY_CACHE_DIR=/tmp/my-trivy
 check "a preset QUALOR_TRIVY_CACHE_DIR is kept" same "$tmp/out/trivy-scan" /tmp/my-trivy
 
+echo "== scan-action: the cache directory in a checkout owned by another user"
+# The scanner runs as node and cannot create .qualor/trivy in the runner's checkout: the workflow's
+# "mkdir -p .qualor/trivy && chmod 0777 .qualor/trivy" step (README) does it as the runner.
+prep "$SCANNER" none ro
+act "$SCANNER" "$ROOT" -e "$SP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKEN" -e INPUT_WAIT=true
+check "without the prepare step the scanner cannot write the cache" same "$tmp/out/cachewrite-scan" failed
+docker run --rm -u 0 -v "$P-ws:/github/workspace" --entrypoint /bin/sh "$SCANNER" -c   'mkdir -p /github/workspace/.qualor/trivy && chmod 0777 /github/workspace/.qualor/trivy && chown 1001:1001 /github/workspace/.qualor'
+act "$SCANNER" "$ROOT" -e "$SP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKEN" -e INPUT_WAIT=true
+check "with the prepared 0777 directory the scanner writes the cache" same "$tmp/out/cachewrite-scan" ok
+
 echo "== control: without the action's safe.directory git refuses the checkout"
 # The image's /etc/gitconfig trusts every directory too; the cases above ignore it
 # (GIT_CONFIG_NOSYSTEM=1), so they show that the action's own setting is enough.

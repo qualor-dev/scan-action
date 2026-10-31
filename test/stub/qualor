@@ -13,6 +13,7 @@ env | sort > "$out/env-$name"
 pwd > "$out/pwd-$name"
 echo "${QUALOR_TRIVY_CACHE_DIR-unset}" > "$out/trivy-$name"
 if git rev-parse HEAD > /dev/null 2>&1; then echo ok; else echo failed; fi > "$out/git-$name"
+if mkdir -p "$QUALOR_TRIVY_CACHE_DIR" 2> /dev/null && : > "$QUALOR_TRIVY_CACHE_DIR/probe" 2> /dev/null; then echo ok; else echo failed; fi > "$out/cachewrite-$name"
 code=0
 case $name in
   dotnet-begin) mkdir -p .qualor/dotnet ;;
