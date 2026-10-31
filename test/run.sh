@@ -236,7 +236,9 @@ check "nothing written in the checkout (no obj/, no .qualor/)" docker run --rm \
 check "the token is not in begin's environment" no_token "$tmp/out/env-dotnet-begin"
 check "the token is not in the build's environment" no_token "$tmp/out/env-build"
 check "the build has HOME=/tmp/qualor-home" has "$tmp/out/env-build" "HOME=/tmp/qualor-home"
-check "the vulnerability database cache defaults to the workspace" same "$tmp/out/trivy-dotnet-end" /github/workspace/.qualor/trivy
+# The scan runs on the copy, so a cache in the workspace would lie outside the scanned checkout and
+# be trusted without a checksum: the scanner keeps its default cache in the temporary HOME.
+check "the vulnerability database cache is left unset" same "$tmp/out/trivy-dotnet-end" unset
 check "end has QUALOR_TOKEN" has "$tmp/out/env-dotnet-end" "QUALOR_TOKEN=$TOKEN"
 check "git reads the checkout in end" same "$tmp/out/git-dotnet-end" ok
 check "no C# warning in the dotnet action" hasnt "$tmp/log" "::warning::"

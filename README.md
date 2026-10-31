@@ -125,8 +125,7 @@ directory in your checkout.
 A cache inside the workspace is safe: the scanner uses the archive only after the Qualor server
 confirms its checksum.
 
-The action uses `.qualor/trivy` in the workspace unless `QUALOR_TRIVY_CACHE_DIR` is set. The same
-three steps go around `qualor-dev/scan-action/dotnet`.
+The action uses `.qualor/trivy` in the workspace unless `QUALOR_TRIVY_CACHE_DIR` is set.
 
 ## C#
 
@@ -148,7 +147,8 @@ fails and nothing is uploaded. The main action warns when it finds C# files.
 The C# action builds and analyses a copy of the checkout, with its history, so the build's outputs
 (`bin/`, `obj/`) do not land in the workspace, and a very large checkout takes a little longer to
 start. Files that `args` refers to (such as a SARIF file) are copied with it when earlier steps
-wrote them into the workspace.
+wrote them into the workspace. Because it scans a copy, the C# action keeps no vulnerability
+database cache and downloads the database on each run: leave the cache steps out.
 
 The token is given to `qualor dotnet end` only and kept out of the build's environment. The build
 still runs your repository's code (MSBuild targets, source generators) in the same container, so it
