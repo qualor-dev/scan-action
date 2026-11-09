@@ -138,9 +138,9 @@ in [qualor.dev/docs/github](https://qualor.dev/docs/github).
 
 ## Versions
 
-The action's version follows Qualor's: `v0.14.0` runs `qualor/scanner:0.14.0`. `@v0.14` follows
+The action's version follows Qualor's: `v0.14.1` runs `qualor/scanner:0.14.1`. `@v0.14` follows
 the 0.14 patch releases and `@v0` the latest release. Pick the version that matches your Qualor
-server, or pin a full version (`@v0.14.0`) to control every update.
+server, or pin a full version (`@v0.14.1`) to control every update.
 
 ## Licence
 
