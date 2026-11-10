@@ -130,8 +130,8 @@ for s in "$here/entrypoint.sh" "$here/dotnet/entrypoint.sh"; do
   # shellcheck disable=SC2016
   check "$n has no GitHub expression" hasnt "$s" '${{'
 done
-check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.14.1 ]
-check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.14.1 ]
+check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.15.0 ]
+check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.15.0 ]
 
 echo "== shellcheck"
 for s in entrypoint.sh dotnet/entrypoint.sh test/run.sh test/stub/qualor test/stub/dotnet; do
@@ -271,9 +271,7 @@ check "token not in the output" no_token "$tmp/log"
 echo "== scan-action with the real scanner (--dry-run)"
 prep "$SCANNER" none ro
 sha=$(docker run --rm -v "$P-out:/out" --entrypoint cat "$SCANNER" /out/sha)
-# TODO(0.15 release): the 0.14.0 scanner refuses a cache directory inside the repository (the default
-# of the action), so this case sets one outside. Drop the variable when the image tag moves to 0.15.
-act "$SCANNER" "$ROOT" -e GIT_CONFIG_NOSYSTEM=1 -e QUALOR_TRIVY_CACHE_DIR=/tmp/qualor-trivy -e "INPUT_SERVER-URL=" -e "INPUT_TOKEN=$TOKEN" \
+act "$SCANNER" "$ROOT" -e GIT_CONFIG_NOSYSTEM=1 -e "INPUT_SERVER-URL=" -e "INPUT_TOKEN=$TOKEN" \
   -e "INPUT_PROJECT-KEY=" -e INPUT_CONFIG= -e INPUT_WAIT=false -e "INPUT_ARGS=--dry-run --output /out/report.json.gz" \
   -e GITHUB_EVENT_NAME=push -e GITHUB_REF=refs/heads/main -e GITHUB_REF_NAME=main \
   -e GITHUB_REF_TYPE=branch -e "GITHUB_SHA=$sha" -e GITHUB_REPOSITORY=acme/demo \
