@@ -11,7 +11,7 @@ permission. See [qualor.dev/docs/github](https://qualor.dev/docs/github).
 ## Usage
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v5
   with:
     fetch-depth: 0
     persist-credentials: false
@@ -51,7 +51,7 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -106,7 +106,7 @@ runs. The action is a Docker action and cannot run `actions/cache` itself, so pu
 around it:
 
 ```yaml
-- uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+- uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
   with:
     path: .qualor/trivy
     key: qualor-trivy-db-${{ github.run_id }}
@@ -116,7 +116,7 @@ around it:
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
-- uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+- uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
   if: always() && hashFiles('.qualor/trivy/server.json') != ''
   with:
     path: .qualor/trivy
@@ -152,7 +152,9 @@ The C# action builds and analyses a copy of the checkout, with its history, so t
 (`bin/`, `obj/`) do not land in the workspace, and a very large checkout takes a little longer to
 start. Files that `args` refers to (such as a SARIF file) are copied with it when earlier steps
 wrote them into the workspace. Because it scans a copy, the C# action keeps no vulnerability
-database cache and downloads the database on each run: leave the cache steps out.
+database cache and downloads the database on each run: leave the cache steps out. Do not point
+`QUALOR_TRIVY_CACHE_DIR` into the workspace for the C# action: the scan runs on a copy, so the
+directory would be trusted without the check the main action gets.
 
 The token is given to `qualor dotnet end` only and kept out of the build's environment. The build
 still runs your repository's code (MSBuild targets, source generators) in the same container, so it
