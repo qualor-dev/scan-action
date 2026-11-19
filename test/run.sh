@@ -148,8 +148,8 @@ check "the fix steps take their inputs through env" has "$tmp/yaml.log" "fix-run
 check "the token is set for the last step only" [ "$(grep -c 'QUALOR_TOKEN' "$here/fix/action.yml")" -eq 1 ]
 check "fix/action.yml uses $FIXIMAGE" [ "$FIXIMAGE" = qualor/scanner:0.16.0 ]
 check "the copy step: docker create, cp, rm" sh -c "grep -q 'docker create' '$tmp/fix-copy.sh' && grep -q 'docker cp' '$tmp/fix-copy.sh' && grep -q 'docker rm' '$tmp/fix-copy.sh' && grep -q '/usr/local/bin/qualor' '$tmp/fix-copy.sh'"
-check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.15.1 ]
-check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.15.1 ]
+check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.16.0 ]
+check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.16.0 ]
 
 echo "== shellcheck"
 for s in entrypoint.sh dotnet/entrypoint.sh test/run.sh test/stub/qualor test/stub/dotnet ../fix-copy.sh ../fix-musl.sh ../fix-run.sh; do

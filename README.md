@@ -16,7 +16,7 @@ permission. See [qualor.dev/docs/github](https://qualor.dev/docs/github).
     fetch-depth: 0
     persist-credentials: false
     ref: ${{ github.event.pull_request.head.sha || github.sha }}
-- uses: qualor-dev/scan-action@v0.15
+- uses: qualor-dev/scan-action@v0.16
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       # Install dependencies (JavaScript, TypeScript, Go) or build (Java) here, before the scan.
-      - uses: qualor-dev/scan-action@v0.15
+      - uses: qualor-dev/scan-action@v0.16
         with:
           server-url: ${{ vars.QUALOR_URL }}
           token: ${{ secrets.QUALOR_TOKEN }}
@@ -112,7 +112,7 @@ around it:
     key: qualor-trivy-db-${{ github.run_id }}
     restore-keys: qualor-trivy-db-
 - run: mkdir -p .qualor/trivy && chmod 0777 .qualor/trivy
-- uses: qualor-dev/scan-action@v0.15
+- uses: qualor-dev/scan-action@v0.16
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
@@ -137,7 +137,7 @@ Qualor analyses C# inside your build, so C# projects use the `dotnet` action ins
 `qualor dotnet begin`, your build and `qualor dotnet end` in the `qualor/scanner-dotnet` image:
 
 ```yaml
-- uses: qualor-dev/scan-action/dotnet@v0.15
+- uses: qualor-dev/scan-action/dotnet@v0.16
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
@@ -224,9 +224,9 @@ in [qualor.dev/docs/github](https://qualor.dev/docs/github).
 
 ## Versions
 
-The action's version follows Qualor's: `v0.15.1` runs `qualor/scanner:0.15.1`. `@v0.15` follows
-the 0.15 patch releases and `@v0` the latest release. Pick the version that matches your Qualor
-server, or pin a full version (`@v0.15.1`) to control every update.
+The action's version follows Qualor's: `v0.16.0` runs `qualor/scanner:0.16.0`. `@v0.16` follows
+the 0.16 patch releases and `@v0` the latest release. Pick the version that matches your Qualor
+server, or pin a full version (`@v0.16.0`) to control every update.
 
 ## Licence
 
