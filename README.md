@@ -162,6 +162,53 @@ could read the token. The token can only upload and read analyses of its own pro
 not acceptable, use the workflow template that keeps the token in a separate step:
 [qualor-dotnet.yml](https://github.com/qualor-dev/qualor/blob/main/integrations/github/qualor-dotnet.yml).
 
+## Fix pull requests
+
+`qualor-dev/scan-action/fix` runs `qualor fix`, which opens pull requests that bump vulnerable
+dependencies. It runs on the runner, after your own setup steps, so it uses your package manager and
+your registry credentials. It copies the `qualor` binary out of the scanner image, so it needs a
+glibc runner (Ubuntu or Debian, not Alpine) and Docker:
+
+```yaml
+name: qualor-fix
+on:
+  push:
+    branches: [main] # your default branch
+  schedule:
+    - cron: '17 3 * * *' # daily, so fixes are picked up every day
+permissions:
+  contents: read
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Your own setup comes first: setup-node, setup-java, setup-go, registry login, ...
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: qualor-dev/scan-action/fix@v0.16
+        with:
+          server-url: ${{ vars.QUALOR_URL }}
+          token: ${{ secrets.QUALOR_TOKEN }}
+```
+
+The workflow needs no write permission: the pull requests are opened by Qualor's GitHub App.
+
+| Input           | Default                 | Description                                                                                                  |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `server-url`    | required                | Your Qualor server, for example `https://qualor.example.com`.                                                |
+| `token`         | required                | A project analysis token. Pass it from a secret.                                                             |
+| `project-key`   |                         | The Qualor project key. Default: `project.key` in `qualor.yml`, else the repository (`owner/repo`).          |
+| `scanner-image` | `qualor/scanner:0.16.0` | The image the `qualor` binary is copied from. Use a mirror here if you cannot pull from Docker Hub.         |
+| `args`          |                         | More `qualor fix` options, for example `--max 3`. Split at blanks on purpose: quotes are not interpreted. |
+
+The token reaches only the step that runs `qualor fix`, and is never written to `GITHUB_ENV`.
+The step passes or fails with `qualor fix`.
+
 ## Pull requests from forks
 
 GitHub gives no secrets to workflows of pull requests from forks, so the scan could not upload; the

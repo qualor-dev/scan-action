@@ -8,6 +8,8 @@
 # /github/workspace owned by another user (1001, the runner's), HOME=/github/home not writable,
 # and the inputs as INPUT_<NAME> variables with the hyphens kept. `qualor` and `dotnet` are
 # recording stubs (test/stub), except in the last case, which runs the real scanner (--dry-run).
+# fix/action.yml is a composite action that runs on the runner: its three steps are run here in the
+# scanner image (glibc) with a recording stub for the binary, the docker step only being checked as text.
 # Also runs shellcheck (koalaman/shellcheck:stable) on every script.
 set -u
 
@@ -17,6 +19,7 @@ MSYS_NO_PATHCONV=1
 export MSYS_NO_PATHCONV
 SCANNER=$(sed -n 's|^  image: docker://||p' "$here/action.yml")
 DOTNET=$(sed -n 's|^  image: docker://||p' "$here/dotnet/action.yml")
+FIXIMAGE=$(sed -n 's|^    default: ||p' "$here/fix/action.yml" | grep '^qualor/scanner:')
 SHELLCHECK=koalaman/shellcheck:stable
 TOKEN=qlr_test_5ecret_70ken_v4lue
 URL=https://qualor.example.com
@@ -106,7 +109,7 @@ act() {
 stubpath() { echo "PATH=/stub:$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1" | sed -n 's/^PATH=//p')"; }
 
 for v in src ws home out stub; do docker volume create "$P-$v" > /dev/null; done
-(cd "$here" && tar -cf - action.yml entrypoint.sh dotnet test) |
+(cd "$here" && tar -cf - action.yml entrypoint.sh dotnet fix test) |
   docker run --rm -i -u 0 -v "$P-src:/src" --entrypoint tar "$SCANNER" -xf - -C /src
 
 echo "== the inline scripts"
@@ -118,8 +121,15 @@ docker run --rm -u 0 -v "$P-src:/src" --entrypoint node "$SCANNER" -e '
     const ok = runs.using === "docker" && runs.entrypoint === "/bin/sh" && runs.args.length === 2 && runs.args[0] === "-c";
     fs.writeFileSync("/src/inline-" + o + ".sh", runs.args[1]);
     console.log(o, ok && runs.args[1] === fs.readFileSync("/src/" + s, "utf8") ? "same" : "different");
-  }' > "$tmp/yaml.log" 2>&1
-docker run --rm -v "$P-src:/src" --entrypoint tar "$SCANNER" -cf - -C /src inline-root.sh inline-dotnet.sh |
+  }
+  const fix = yaml.load(fs.readFileSync("/src/fix/action.yml", "utf8")).runs;
+  console.log("fix", fix.using === "composite" && fix.steps.length === 3 && fix.steps.every((s) => s.shell === "bash") ? "composite" : "different");
+  const names = ["copy", "musl", "run"];
+  fix.steps.forEach((s, i) => {
+    fs.writeFileSync("/src/fix-" + names[i] + ".sh", s.run);
+    console.log("fix-" + names[i], /${{/.test(s.run) ? "expression" : "plain", "env:" + Object.keys(s.env || {}).join(","));
+  });' > "$tmp/yaml.log" 2>&1
+docker run --rm -v "$P-src:/src" --entrypoint tar "$SCANNER" -cf - -C /src inline-root.sh inline-dotnet.sh fix-copy.sh fix-musl.sh fix-run.sh |
   tar -xf - -C "$tmp"
 check "action.yml runs entrypoint.sh inline" has "$tmp/yaml.log" "root same"
 check "dotnet/action.yml runs dotnet/entrypoint.sh inline" has "$tmp/yaml.log" "dotnet same"
@@ -130,12 +140,22 @@ for s in "$here/entrypoint.sh" "$here/dotnet/entrypoint.sh"; do
   # shellcheck disable=SC2016
   check "$n has no GitHub expression" hasnt "$s" '${{'
 done
+check "fix/action.yml is a composite action of three bash steps" has "$tmp/yaml.log" "fix composite"
+for n in copy musl run; do
+  check "fix step $n has no GitHub expression in its script" has "$tmp/yaml.log" "fix-$n plain"
+done
+check "the fix steps take their inputs through env" has "$tmp/yaml.log" "fix-run plain env:QUALOR_URL,QUALOR_TOKEN,QUALOR_PROJECT_KEY,FIX_ARGS"
+check "the token is set for the last step only" [ "$(grep -c 'QUALOR_TOKEN' "$here/fix/action.yml")" -eq 1 ]
+check "fix/action.yml uses $FIXIMAGE" [ "$FIXIMAGE" = qualor/scanner:0.16.0 ]
+check "the copy step: docker create, cp, rm" sh -c "grep -q 'docker create' '$tmp/fix-copy.sh' && grep -q 'docker cp' '$tmp/fix-copy.sh' && grep -q 'docker rm' '$tmp/fix-copy.sh' && grep -q '/usr/local/bin/qualor' '$tmp/fix-copy.sh'"
 check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.15.1 ]
 check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.15.1 ]
 
 echo "== shellcheck"
-for s in entrypoint.sh dotnet/entrypoint.sh test/run.sh test/stub/qualor test/stub/dotnet; do
-  if docker run --rm -i "$SHELLCHECK" -s sh - < "$here/$s" > "$tmp/sc.log" 2>&1; then
+for s in entrypoint.sh dotnet/entrypoint.sh test/run.sh test/stub/qualor test/stub/dotnet ../fix-copy.sh ../fix-musl.sh ../fix-run.sh; do
+  f=$here/$s
+  case $s in ../fix-*) f=$tmp/${s#../} ;; esac
+  if docker run --rm -i "$SHELLCHECK" -s sh - < "$f" > "$tmp/sc.log" 2>&1; then
     ok "shellcheck $s"
   else
     ko "shellcheck $s"
@@ -267,6 +287,35 @@ act "$DOTNET" "$DN" -e "$DP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKEN" 
 check "exit code of end (1)" status_is 1
 check "no abort after end" hasnt "$tmp/out/calls" "[abort]"
 check "token not in the output" no_token "$tmp/log"
+
+echo "== fix: the sub-action's steps on the runner"
+# The binary is the recording stub, copied to $RUNNER_TEMP/qualor as the copy step would.
+FIXPRE='mkdir -p /tmp/rt && cp /stub/qualor /tmp/rt/qualor'
+{ echo "$FIXPRE"; cat "$tmp/fix-run.sh"; } > "$tmp/fix-go.sh"
+prep "$SCANNER" none ro
+act "$SCANNER" "$tmp/fix-go.sh" -e "$SP" -e RUNNER_TEMP=/tmp/rt -e "QUALOR_URL=$URL" -e "QUALOR_TOKEN=$TOKEN"   -e "QUALOR_PROJECT_KEY=acme/demo" -e "FIX_ARGS=--max 3  --timeout 1h *"
+check "exit 0" status_is 0
+check "arguments: split at blanks, no file name expands" same "$tmp/out/calls" "qualor [fix] [--max] [3] [--timeout] [1h] [*]"
+check "the token and the server reach the binary" has "$tmp/out/env-fix" "QUALOR_TOKEN=$TOKEN"
+check "the server URL reaches the binary" has "$tmp/out/env-fix" "QUALOR_URL=$URL"
+check "the project key reaches the binary" has "$tmp/out/env-fix" "QUALOR_PROJECT_KEY=acme/demo"
+check "token not in the output" no_token "$tmp/log"
+# shellcheck disable=SC2016 # the substitution must stay unexpanded
+act "$SCANNER" "$tmp/fix-go.sh" -e "$SP" -e RUNNER_TEMP=/tmp/rt -e "QUALOR_URL=$URL" -e "QUALOR_TOKEN=$TOKEN"   -e QUALOR_PROJECT_KEY= -e 'FIX_ARGS=; touch /out/injected $(touch /out/injected2)'
+check "an empty project key is not passed on" hasnt "$tmp/out/env-fix" "QUALOR_PROJECT_KEY"
+check "args never reach a shell as code" missing "$tmp/out/injected"
+check "args never expand a substitution" missing "$tmp/out/injected2"
+prep "$SCANNER" none ro
+act "$SCANNER" "$tmp/fix-go.sh" -e "$SP" -e RUNNER_TEMP=/tmp/rt -e "QUALOR_URL=$URL" -e "QUALOR_TOKEN=$TOKEN"   -e QUALOR_PROJECT_KEY= -e FIX_ARGS= -e STUB_EXIT=4
+check "exit code of qualor fix (4)" status_is 4
+check "no arguments: plain qualor fix" same "$tmp/out/calls" "qualor [fix]"
+prep "$SCANNER" none ro
+act "$SCANNER" "$tmp/fix-musl.sh"
+check "glibc image: the musl check passes" status_is 0
+{ echo 'touch /lib/ld-musl-x86_64.so.1'; cat "$tmp/fix-musl.sh"; } > "$tmp/fix-musl-on.sh"
+act "$SCANNER" "$tmp/fix-musl-on.sh" -u 0
+check "musl image: exit 2" status_is 2
+check "musl image: the error says why" has "$tmp/log" "::error::qualor fix needs a glibc image (Debian, Ubuntu, RHEL); this image uses musl"
 
 echo "== scan-action with the real scanner (--dry-run)"
 prep "$SCANNER" none ro

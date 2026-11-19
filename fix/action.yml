@@ -1,0 +1,57 @@
+name: Qualor fix
+description: Opens pull requests that bump vulnerable dependencies, with qualor fix, on the runner
+author: Qualor
+branding:
+  icon: shield
+  color: blue
+inputs:
+  server-url:
+    description: Your Qualor server, for example https://qualor.example.com
+    required: true
+  token:
+    description: A project analysis token (store it as a secret)
+    required: true
+  project-key:
+    description: 'The Qualor project key (default: the key in qualor.yml, else the repository, owner/repo)'
+    required: false
+  scanner-image:
+    description: The image the qualor binary is copied from; the binary needs a glibc runner (Linux, not Alpine)
+    required: false
+    default: qualor/scanner:0.16.0
+  args:
+    description: More qualor fix options, separated by spaces (not quoted), for example --max 3
+    required: false
+# A composite action: it runs on the runner, after your own setup steps (setup-node, setup-java, ...),
+# so the package manager and the registry credentials are the ones of your job. The inputs reach the
+# shell through env, never through the text of a script. The token is set for the last step only.
+runs:
+  using: composite
+  steps:
+    - name: Copy the qualor binary out of the scanner image
+      shell: bash
+      env:
+        SCANNER_IMAGE: ${{ inputs.scanner-image }}
+      run: |
+        set -eu
+        id=$(docker create "$SCANNER_IMAGE")
+        trap 'docker rm "$id" > /dev/null' EXIT
+        docker cp "$id:/usr/local/bin/qualor" "$RUNNER_TEMP/qualor"
+        chmod 755 "$RUNNER_TEMP/qualor"
+    - name: Check for glibc
+      shell: bash
+      run: |
+        if [ -e /lib/ld-musl-x86_64.so.1 ] || [ -e /lib/ld-musl-aarch64.so.1 ]; then echo "::error::qualor fix needs a glibc image (Debian, Ubuntu, RHEL); this image uses musl"; exit 2; fi
+    - name: Run qualor fix
+      shell: bash
+      env:
+        QUALOR_URL: ${{ inputs.server-url }}
+        QUALOR_TOKEN: ${{ inputs.token }}
+        QUALOR_PROJECT_KEY: ${{ inputs.project-key }}
+        FIX_ARGS: ${{ inputs.args }}
+      run: |
+        set -eu
+        [ -n "$QUALOR_PROJECT_KEY" ] || unset QUALOR_PROJECT_KEY
+        # The args input is split at blanks, like a command line without quotes; no file names expand.
+        set -f
+        # shellcheck disable=SC2086
+        exec "$RUNNER_TEMP/qualor" fix $FIX_ARGS
