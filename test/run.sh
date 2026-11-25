@@ -8,6 +8,7 @@
 # /github/workspace owned by another user (1001, the runner's), HOME=/github/home not writable,
 # and the inputs as INPUT_<NAME> variables with the hyphens kept. `qualor` and `dotnet` are
 # recording stubs (test/stub), except in the last case, which runs the real scanner (--dry-run).
+# `qualor-entrypoint` is the image's own, with its last line pointed at the stub.
 # fix/action.yml is a composite action that runs on the runner: its three steps are run here in the
 # scanner image (glibc) with a recording stub for the binary, the docker step only being checked as text.
 # Also runs shellcheck (koalaman/shellcheck:stable) on every script.
@@ -62,6 +63,9 @@ find /github/workspace /out -mindepth 1 -delete
 mkdir -p /stub
 cp /src/test/stub/qualor /src/test/stub/dotnet /stub/
 chmod 755 /stub/qualor /stub/dotnet
+sed "s|^exec /usr/local/bin/qualor |exec qualor |" /usr/local/bin/qualor-entrypoint > /stub/qualor-entrypoint
+grep -q "^exec qualor " /stub/qualor-entrypoint
+chmod 755 /stub/qualor-entrypoint
 cd /github/workspace
 git init -q -b main
 git config user.email test@example.com
@@ -146,10 +150,10 @@ for n in copy musl run; do
 done
 check "the fix steps take their inputs through env" has "$tmp/yaml.log" "fix-run plain env:QUALOR_URL,QUALOR_TOKEN,QUALOR_PROJECT_KEY,FIX_ARGS"
 check "the token is set for the last step only" [ "$(grep -c 'QUALOR_TOKEN' "$here/fix/action.yml")" -eq 1 ]
-check "fix/action.yml uses $FIXIMAGE" [ "$FIXIMAGE" = qualor/scanner:0.16.0 ]
+check "fix/action.yml uses $FIXIMAGE" [ "$FIXIMAGE" = qualor/scanner:0.17.0 ]
 check "the copy step: docker create, cp, rm" sh -c "grep -q 'docker create' '$tmp/fix-copy.sh' && grep -q 'docker cp' '$tmp/fix-copy.sh' && grep -q 'docker rm' '$tmp/fix-copy.sh' && grep -q '/usr/local/bin/qualor' '$tmp/fix-copy.sh'"
-check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.16.0 ]
-check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.16.0 ]
+check "action.yml uses $SCANNER" [ "$SCANNER" = qualor/scanner:0.17.0 ]
+check "dotnet/action.yml uses $DOTNET" [ "$DOTNET" = qualor/scanner-dotnet:0.17.0 ]
 
 echo "== shellcheck"
 for s in entrypoint.sh dotnet/entrypoint.sh test/run.sh test/stub/qualor test/stub/dotnet ../fix-copy.sh ../fix-musl.sh ../fix-run.sh; do
@@ -175,7 +179,8 @@ act "$SCANNER" "$ROOT" -e "$SP" -e GIT_CONFIG_NOSYSTEM=1 -e "INPUT_SERVER-URL=$U
   -e "INPUT_ARGS=--sarif osv.sarif  --branch feature/x --coverage src/*.ts"
 check "exit 0" status_is 0
 check "arguments" same "$tmp/out/calls" "qualor [scan] [--server-url] [$URL] [--project-key=acme/demo] [--config] [ci/qualor.yml] [--no-wait] [--sarif] [osv.sarif] [--branch] [feature/x] [--coverage] [src/*.ts]"
-check "QUALOR_TOKEN set for the scan" has "$tmp/out/env-scan" "QUALOR_TOKEN=$TOKEN"
+check "the token reaches qualor on a file descriptor" same "$tmp/out/tokenfd-scan" "$TOKEN"
+check "no QUALOR_TOKEN in the scan's environment" hasnt "$tmp/out/env-scan" "QUALOR_TOKEN="
 check "INPUT_TOKEN removed" hasnt "$tmp/out/env-scan" "INPUT_TOKEN="
 check "HOME=/tmp/qualor-home" has "$tmp/out/env-scan" "HOME=/tmp/qualor-home"
 check "the vulnerability database cache defaults to the workspace" same "$tmp/out/trivy-scan" /github/workspace/.qualor/trivy
@@ -214,6 +219,7 @@ act "$SCANNER" "$ROOT" -e "$SP" -e "INPUT_SERVER-URL=" -e "INPUT_TOKEN=" -e INPU
 check "--dry-run without server and token runs (exit 0)" status_is 0
 check "--dry-run without server and token: arguments" same "$tmp/out/calls" "qualor [scan] [--dry-run] [--output] [/out/r.json.gz]"
 check "--dry-run without a token: no QUALOR_TOKEN" hasnt "$tmp/out/env-scan" "QUALOR_TOKEN="
+check "--dry-run without a token: no file descriptor" same "$tmp/out/tokenfd-scan" none
 
 act "$SCANNER" "$ROOT" -e "$SP" -e "INPUT_SERVER-URL=$URL" -e "INPUT_TOKEN=$TOKEN" -e INPUT_WAIT=true \
   -e QUALOR_TRIVY_CACHE_DIR=/tmp/my-trivy
@@ -259,7 +265,8 @@ check "the build has HOME=/tmp/qualor-home" has "$tmp/out/env-build" "HOME=/tmp/
 # The scan runs on the copy, so a cache in the workspace would lie outside the scanned checkout and
 # be trusted without a checksum: the scanner keeps its default cache in the temporary HOME.
 check "the vulnerability database cache is left unset" same "$tmp/out/trivy-dotnet-end" unset
-check "end has QUALOR_TOKEN" has "$tmp/out/env-dotnet-end" "QUALOR_TOKEN=$TOKEN"
+check "end gets the token on a file descriptor" same "$tmp/out/tokenfd-dotnet-end" "$TOKEN"
+check "no QUALOR_TOKEN in end's environment" hasnt "$tmp/out/env-dotnet-end" "QUALOR_TOKEN="
 check "git reads the checkout in end" same "$tmp/out/git-dotnet-end" ok
 check "no C# warning in the dotnet action" hasnt "$tmp/log" "::warning::"
 check "token not in the output" no_token "$tmp/log"

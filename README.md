@@ -16,7 +16,7 @@ permission. See [qualor.dev/docs/github](https://qualor.dev/docs/github).
     fetch-depth: 0
     persist-credentials: false
     ref: ${{ github.event.pull_request.head.sha || github.sha }}
-- uses: qualor-dev/scan-action@v0.16
+- uses: qualor-dev/scan-action@v0.17
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       # Install dependencies (JavaScript, TypeScript, Go) or build (Java) here, before the scan.
-      - uses: qualor-dev/scan-action@v0.16
+      - uses: qualor-dev/scan-action@v0.17
         with:
           server-url: ${{ vars.QUALOR_URL }}
           token: ${{ secrets.QUALOR_TOKEN }}
@@ -95,6 +95,9 @@ wrong or revoked token). The options are listed at
 
 The action runs on Linux runners (`ubuntu-latest` or a self-hosted Linux runner with Docker).
 
+The token reaches `qualor` on a file descriptor, not in the environment. The analyzers run code
+from your repository (an ESLint config, a PMD ruleset), and they cannot read the token there.
+
 The scanner runs as its own user and cannot write into the checkout, so an option that writes a
 file (such as `--output`) needs a path under `/tmp`, for example `--output /tmp/report.json.gz`.
 Such a file is gone when the step ends.
@@ -112,7 +115,7 @@ around it:
     key: qualor-trivy-db-${{ github.run_id }}
     restore-keys: qualor-trivy-db-
 - run: mkdir -p .qualor/trivy && chmod 0777 .qualor/trivy
-- uses: qualor-dev/scan-action@v0.16
+- uses: qualor-dev/scan-action@v0.17
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
@@ -137,7 +140,7 @@ Qualor analyses C# inside your build, so C# projects use the `dotnet` action ins
 `qualor dotnet begin`, your build and `qualor dotnet end` in the `qualor/scanner-dotnet` image:
 
 ```yaml
-- uses: qualor-dev/scan-action/dotnet@v0.16
+- uses: qualor-dev/scan-action/dotnet@v0.17
   with:
     server-url: ${{ vars.QUALOR_URL }}
     token: ${{ secrets.QUALOR_TOKEN }}
@@ -156,10 +159,10 @@ database cache and downloads the database on each run: leave the cache steps out
 `QUALOR_TRIVY_CACHE_DIR` into the workspace for the C# action: the scan runs on a copy, so the
 directory would be trusted without the check the main action gets.
 
-The token is given to `qualor dotnet end` only and kept out of the build's environment. The build
-still runs your repository's code (MSBuild targets, source generators) in the same container, so it
-could read the token. The token can only upload and read analyses of its own project. If that is
-not acceptable, use the workflow template that keeps the token in a separate step:
+The token is given to `qualor dotnet end` only, on a file descriptor, and kept out of the build's
+environment. The build still runs your repository's code (MSBuild targets, source generators) in
+the same container, so it could read the token. The token can only upload and read analyses of its
+own project. If that is not acceptable, use the workflow template that keeps the token in a separate step:
 [qualor-dotnet.yml](https://github.com/qualor-dev/qualor/blob/main/integrations/github/qualor-dotnet.yml).
 
 ## Fix pull requests
@@ -190,7 +193,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - uses: qualor-dev/scan-action/fix@v0.16
+      - uses: qualor-dev/scan-action/fix@v0.17
         with:
           server-url: ${{ vars.QUALOR_URL }}
           token: ${{ secrets.QUALOR_TOKEN }}
@@ -203,7 +206,7 @@ The workflow needs no write permission: the pull requests are opened by Qualor's
 | `server-url`    | required                | Your Qualor server, for example `https://qualor.example.com`.                                                |
 | `token`         | required                | A project analysis token. Pass it from a secret.                                                             |
 | `project-key`   |                         | The Qualor project key. Default: `project.key` in `qualor.yml`, else the repository (`owner/repo`).          |
-| `scanner-image` | `qualor/scanner:0.16.0` | The image the `qualor` binary is copied from. Use a mirror here if you cannot pull from Docker Hub.         |
+| `scanner-image` | `qualor/scanner:0.17.0` | The image the `qualor` binary is copied from. Use a mirror here if you cannot pull from Docker Hub.         |
 | `args`          |                         | More `qualor fix` options, for example `--max 3`. Split at blanks on purpose: quotes are not interpreted. |
 
 The token reaches only the step that runs `qualor fix`, and is never written to `GITHUB_ENV`.
@@ -224,9 +227,9 @@ in [qualor.dev/docs/github](https://qualor.dev/docs/github).
 
 ## Versions
 
-The action's version follows Qualor's: `v0.16.0` runs `qualor/scanner:0.16.0`. `@v0.16` follows
-the 0.16 patch releases and `@v0` the latest release. Pick the version that matches your Qualor
-server, or pin a full version (`@v0.16.0`) to control every update.
+The action's version follows Qualor's: `v0.17.0` runs `qualor/scanner:0.17.0`. `@v0.17` follows
+the 0.17 patch releases and `@v0` the latest release. Pick the version that matches your Qualor
+server, or pin a full version (`@v0.17.0`) to control every update.
 
 ## Licence
 

@@ -79,4 +79,6 @@ if git ls-files -- '*.cs' 2>/dev/null | grep -q .; then
   echo '::warning::This repository has C# files. Qualor analyses C# inside its build: use qualor-dev/scan-action/dotnet for it (https://qualor.dev/docs/languages-and-analyzers#c)'
 fi
 
-exec qualor scan "$@"
+# The image's entry point hands the token to qualor on a file descriptor, so the analyzers, which
+# run code from the repository, never find it in an environment.
+exec qualor-entrypoint scan "$@"

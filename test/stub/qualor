@@ -1,6 +1,7 @@
 #!/bin/sh
-# Test stub for qualor: records its arguments, its environment and whether git can read the
-# checkout, then exits with STUB_EXIT (for scan, fix and dotnet end; 0 by default).
+# Test stub for qualor: records its arguments, its environment, the token it got on
+# QUALOR_TOKEN_FD and whether git can read the checkout, then exits with STUB_EXIT (for scan, fix
+# and dotnet end; 0 by default).
 out=/out
 name=$(echo "$*" | cut -d' ' -f1-2 | tr ' ' '-')
 case $1 in scan) name=scan ;; fix) name=fix ;; esac
@@ -12,6 +13,7 @@ case $1 in scan) name=scan ;; fix) name=fix ;; esac
 env | sort > "$out/env-$name"
 pwd > "$out/pwd-$name"
 echo "${QUALOR_TRIVY_CACHE_DIR-unset}" > "$out/trivy-$name"
+if [ -n "${QUALOR_TOKEN_FD:-}" ]; then cat "/dev/fd/$QUALOR_TOKEN_FD"; else echo none; fi > "$out/tokenfd-$name"
 if git rev-parse HEAD > /dev/null 2>&1; then echo ok; else echo failed; fi > "$out/git-$name"
 if mkdir -p "$QUALOR_TRIVY_CACHE_DIR" 2> /dev/null && : > "$QUALOR_TRIVY_CACHE_DIR/probe" 2> /dev/null; then echo ok; else echo failed; fi > "$out/cachewrite-$name"
 code=0

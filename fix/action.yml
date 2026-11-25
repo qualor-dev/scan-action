@@ -17,7 +17,7 @@ inputs:
   scanner-image:
     description: The image the qualor binary is copied from; the binary needs a glibc runner (Linux, not Alpine)
     required: false
-    default: qualor/scanner:0.16.0
+    default: qualor/scanner:0.17.0
   args:
     description: More qualor fix options, separated by spaces (not quoted), for example --max 3
     required: false

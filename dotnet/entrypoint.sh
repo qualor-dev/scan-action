@@ -118,9 +118,11 @@ if [ "$status" -ne 0 ]; then
   exit "$status"
 fi
 
+# The image's entry point hands the token to qualor on a file descriptor, so the analyzers, which
+# run code from the repository, never find it in an environment.
 if [ -n "$token" ]; then
-  QUALOR_TOKEN=$token qualor dotnet end "$@"
+  QUALOR_TOKEN=$token qualor-entrypoint dotnet end "$@"
 else
-  qualor dotnet end "$@"
+  qualor-entrypoint dotnet end "$@"
 fi
 exit $?
